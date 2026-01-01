@@ -49,9 +49,9 @@ jobs:
       - name: Build Archive
         run: |
           xcodebuild clean archive \
-            -project "YourAppName.xcodeproj" \
-            -scheme "YourScheme" \
-            -archivePath "YourAppName.xcarchive" \
+            -project "Broke.xcodeproj" \
+            -scheme "Broke" \
+            -archivePath "Broke.xcarchive" \
             -sdk iphoneos \
             -configuration Release \
             PROVISIONING_PROFILE_SPECIFIER="" \
@@ -61,7 +61,7 @@ jobs:
       - name: Export IPA
         run: |
           xcodebuild -exportArchive \
-            -archivePath "YourAppName.xcarchive" \
+            -archivePath "Broke.xcarchive" \
             -exportOptionsPlist "ExportOptions.plist" \
             -exportPath "Output" \
             -allowProvisioningUpdates
@@ -70,6 +70,6 @@ jobs:
         run: |
           xcrun altool --upload-app \
             --type ios \
-            --file "Output/YourAppName.ipa" \
+            --file "Output/Broke.ipa" \
             --apiKey "${{ secrets.APPSTORE_API_KEY_ID }}" \
             --apiIssuer "${{ secrets.APPSTORE_ISSUER_ID }}"
