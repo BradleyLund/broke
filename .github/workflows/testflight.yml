@@ -37,14 +37,29 @@ jobs:
           security import $CERTIFICATE_PATH -P "$P12_PASSWORD" -A -t cert -f pkcs12 -k $KEYCHAIN_PATH
           security list-keychain -d user -s $KEYCHAIN_PATH
 
-          # apply provisioning profile
+          # extract provisioning profile UUID
+          PP_PLIST=$RUNNER_TEMP/provisioning_profile.plist
+          security cms -D -i "$PP_PATH" > "$PP_PLIST"
+          PROVISIONING_PROFILE_UUID=$(/usr/libexec/PlistBuddy -c "Print UUID" "$PP_PLIST")
+          echo "PROVISIONING_PROFILE_UUID=$PROVISIONING_PROFILE_UUID" >> $GITHUB_ENV
+          echo "Extracted Provisioning Profile UUID: $PROVISIONING_PROFILE_UUID"
+          
+          # apply provisioning profile with UUID as filename (required format)
           mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
-          cp $PP_PATH ~/Library/MobileDevice/Provisioning\ Profiles/
+          cp "$PP_PATH" ~/Library/MobileDevice/Provisioning\ Profiles/"$PROVISIONING_PROFILE_UUID.mobileprovision"
 
       - name: Set up App Store Connect API Key
         run: |
           mkdir -p ~/.appstoreconnect/private_keys
           echo "${{ secrets.APPSTORE_API_PRIVATE_KEY }}" > ~/.appstoreconnect/private_keys/AuthKey_${{ secrets.APPSTORE_API_KEY_ID }}.p8
+
+      - name: Update ExportOptions.plist with Provisioning Profile UUID
+        run: |
+          /usr/libexec/PlistBuddy -c "Add :provisioningProfiles dict" ExportOptions.plist 2>/dev/null || true
+          /usr/libexec/PlistBuddy -c "Delete :provisioningProfiles" ExportOptions.plist 2>/dev/null || true
+          /usr/libexec/PlistBuddy -c "Add :provisioningProfiles dict" ExportOptions.plist
+          /usr/libexec/PlistBuddy -c "Add :provisioningProfiles:com.bradleylund.Broke string $PROVISIONING_PROFILE_UUID" ExportOptions.plist
+          /usr/libexec/PlistBuddy -c "Set :signingStyle manual" ExportOptions.plist
 
       - name: Build Archive
         run: |
@@ -54,16 +69,17 @@ jobs:
             -archivePath "Broke.xcarchive" \
             -sdk iphoneos \
             -configuration Release \
-            CODE_SIGN_STYLE="Automatic" \
-            -allowProvisioningUpdates
+            CODE_SIGN_STYLE="Manual" \
+            CODE_SIGN_IDENTITY="Apple Distribution" \
+            PROVISIONING_PROFILE_SPECIFIER="$PROVISIONING_PROFILE_UUID" \
+            DEVELOPMENT_TEAM="UVTK3H3UYR"
 
       - name: Export IPA
         run: |
           xcodebuild -exportArchive \
             -archivePath "Broke.xcarchive" \
             -exportOptionsPlist "ExportOptions.plist" \
-            -exportPath "Output" \
-            -allowProvisioningUpdates
+            -exportPath "Output"
 
       - name: Upload to TestFlight
         run: |
