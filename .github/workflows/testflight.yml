@@ -55,11 +55,18 @@ jobs:
 
       - name: Update ExportOptions.plist with Provisioning Profile UUID
         run: |
-          /usr/libexec/PlistBuddy -c "Add :provisioningProfiles dict" ExportOptions.plist 2>/dev/null || true
+          # Delete existing provisioningProfiles if it exists
           /usr/libexec/PlistBuddy -c "Delete :provisioningProfiles" ExportOptions.plist 2>/dev/null || true
+          
+          # Add provisioningProfiles dictionary
           /usr/libexec/PlistBuddy -c "Add :provisioningProfiles dict" ExportOptions.plist
+          
+          # Add the bundle ID to UUID mapping
           /usr/libexec/PlistBuddy -c "Add :provisioningProfiles:com.bradleylund.Broke string $PROVISIONING_PROFILE_UUID" ExportOptions.plist
-          /usr/libexec/PlistBuddy -c "Set :signingStyle manual" ExportOptions.plist
+          
+          # Add signingStyle (delete first if exists, then add)
+          /usr/libexec/PlistBuddy -c "Delete :signingStyle" ExportOptions.plist 2>/dev/null || true
+          /usr/libexec/PlistBuddy -c "Add :signingStyle string manual" ExportOptions.plist
 
       - name: Build Archive
         run: |
