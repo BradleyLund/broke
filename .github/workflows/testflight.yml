@@ -54,9 +54,8 @@ jobs:
             -archivePath "Broke.xcarchive" \
             -sdk iphoneos \
             -configuration Release \
-            PROVISIONING_PROFILE_SPECIFIER="" \
-            CODE_SIGN_IDENTITY="Apple Distribution" \
-            CODE_SIGN_STYLE="Manual"
+            CODE_SIGN_STYLE="Automatic" \
+            -allowProvisioningUpdates
 
       - name: Export IPA
         run: |
