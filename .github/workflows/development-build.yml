@@ -1,0 +1,121 @@
+name: Build Development IPA
+
+on:
+  workflow_dispatch:  # Manual trigger
+  push:
+    branches: [ "development" ]  # Or whatever branch you want to use for dev builds
+
+jobs:
+  build-development:
+    runs-on: macos-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Development Certificate and Provisioning Profile
+        env:
+          DEV_BUILD_CERTIFICATE_BASE64: ${{ secrets.DEV_BUILD_CERTIFICATE_BASE64 }}
+          DEV_P12_PASSWORD: ${{ secrets.DEV_P12_PASSWORD }}
+          DEV_PROVISIONING_PROFILE_BASE64: ${{ secrets.DEV_PROVISIONING_PROFILE_BASE64 }}
+          KEYCHAIN_PASSWORD: "temporary_password"
+        run: |
+          # create variables
+          CERTIFICATE_PATH=$RUNNER_TEMP/dev_certificate.p12
+          PP_PATH=$RUNNER_TEMP/dev_pp.mobileprovision
+          KEYCHAIN_PATH=$RUNNER_TEMP/dev-signing.keychain-db
+
+          # import certificate and provisioning profile from secrets
+          echo -n "$DEV_BUILD_CERTIFICATE_BASE64" | base64 --decode -o $CERTIFICATE_PATH
+          echo -n "$DEV_PROVISIONING_PROFILE_BASE64" | base64 --decode -o $PP_PATH
+
+          # create temporary keychain
+          security create-keychain -p "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
+          security set-keychain-settings -lut 21600 $KEYCHAIN_PATH
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
+
+          # import certificate to keychain
+          security import $CERTIFICATE_PATH -P "$DEV_P12_PASSWORD" -A -t cert -f pkcs12 -k $KEYCHAIN_PATH
+          security list-keychain -d user -s $KEYCHAIN_PATH
+
+          # extract provisioning profile UUID
+          PP_PLIST=$RUNNER_TEMP/dev_provisioning_profile.plist
+          security cms -D -i "$PP_PATH" > "$PP_PLIST"
+          DEV_PROVISIONING_PROFILE_UUID=$(/usr/libexec/PlistBuddy -c "Print UUID" "$PP_PLIST")
+          echo "DEV_PROVISIONING_PROFILE_UUID=$DEV_PROVISIONING_PROFILE_UUID" >> $GITHUB_ENV
+          echo "Extracted Development Provisioning Profile UUID: $DEV_PROVISIONING_PROFILE_UUID"
+          
+          # apply provisioning profile with UUID as filename
+          mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
+          cp "$PP_PATH" ~/Library/MobileDevice/Provisioning\ Profiles/"$DEV_PROVISIONING_PROFILE_UUID.mobileprovision"
+
+      - name: Remove Alpha Channel from App Icon
+        run: |
+          ICON_PATH="Broke/Assets.xcassets/AppIcon.appiconset/Icon (3).png"
+          if [ -f "$ICON_PATH" ]; then
+            TEMP_JPEG="$RUNNER_TEMP/icon_temp.jpg"
+            sips -s format jpeg -s formatOptions high "$ICON_PATH" --out "$TEMP_JPEG"
+            sips -s format png -s formatOptions normal "$TEMP_JPEG" --out "$ICON_PATH"
+            rm -f "$TEMP_JPEG"
+            echo "Removed alpha channel from app icon"
+          else
+            echo "Warning: App icon file not found at $ICON_PATH"
+          fi
+
+      - name: Update Development ExportOptions.plist
+        run: |
+          # Copy development export options
+          cp ExportOptions-Development.plist ExportOptions-Dev-Build.plist
+          
+          # Delete existing provisioningProfiles if it exists
+          /usr/libexec/PlistBuddy -c "Delete :provisioningProfiles" ExportOptions-Dev-Build.plist 2>/dev/null || true
+          
+          # Add provisioningProfiles dictionary
+          /usr/libexec/PlistBuddy -c "Add :provisioningProfiles dict" ExportOptions-Dev-Build.plist
+          
+          # Add the bundle ID to UUID mapping for development
+          /usr/libexec/PlistBuddy -c "Add :provisioningProfiles:com.bradleylund.Broke string $DEV_PROVISIONING_PROFILE_UUID" ExportOptions-Dev-Build.plist
+
+      - name: Build Development Archive
+        run: |
+          xcodebuild clean archive \
+            -project "Broke.xcodeproj" \
+            -scheme "Broke" \
+            -archivePath "Broke-Development.xcarchive" \
+            -sdk iphoneos \
+            -configuration Debug \
+            CODE_SIGN_STYLE="Manual" \
+            CODE_SIGN_IDENTITY="Apple Development" \
+            PROVISIONING_PROFILE_SPECIFIER="$DEV_PROVISIONING_PROFILE_UUID" \
+            DEVELOPMENT_TEAM="UVTK3H3UYR"
+
+      - name: Export Development IPA
+        run: |
+          xcodebuild -exportArchive \
+            -archivePath "Broke-Development.xcarchive" \
+            -exportOptionsPlist "ExportOptions-Dev-Build.plist" \
+            -exportPath "Development-Output"
+
+      - name: Upload Development IPA as Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Broke-Development-IPA
+          path: Development-Output/Broke.ipa
+          retention-days: 30
+
+      - name: Create Release with Development IPA
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: dev-build-${{ github.run_number }}
+          name: Development Build ${{ github.run_number }}
+          body: |
+            Development build for direct installation via USB/iTunes.
+            
+            **Installation Instructions:**
+            1. Download the Broke.ipa file
+            2. Connect your iPhone to your PC via USB
+            3. Use iTunes, 3uTools, or similar to install the IPA
+            4. Trust the developer certificate in Settings > General > VPN & Device Management
+          files: Development-Output/Broke.ipa
+          draft: false
+          prerelease: true
