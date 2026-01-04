@@ -55,31 +55,15 @@ jobs:
 
       - name: Remove Alpha Channel from App Icon
         run: |
-          # Remove alpha channel from iOS app icon (1024x1024) by compositing over white background
+          # Remove alpha channel from iOS app icon (1024x1024) using sips (built-in macOS tool)
           ICON_PATH="Broke/Assets.xcassets/AppIcon.appiconset/Icon (3).png"
           if [ -f "$ICON_PATH" ]; then
-            # Install Pillow if not available
-            python3 -m pip install --quiet Pillow || true
-            
-            # Use Python to composite icon over white background and remove alpha channel
-            python3 << 'EOF'
-          from PIL import Image
-          
-          icon_path = "Broke/Assets.xcassets/AppIcon.appiconset/Icon (3).png"
-          img = Image.open(icon_path)
-          
-          # Convert RGBA to RGB by compositing over white background
-          if img.mode == 'RGBA':
-              background = Image.new('RGB', img.size, (255, 255, 255))
-              background.paste(img, mask=img.split()[3])  # Use alpha channel as mask
-              img = background
-          elif img.mode != 'RGB':
-              img = img.convert('RGB')
-          
-          # Save without alpha channel
-          img.save(icon_path, 'PNG', optimize=False)
-          print(f"Removed alpha channel from {icon_path}")
-          EOF
+            # Convert to JPEG (removes alpha) then back to PNG to ensure no alpha channel
+            TEMP_JPEG="$RUNNER_TEMP/icon_temp.jpg"
+            sips -s format jpeg -s formatOptions high "$ICON_PATH" --out "$TEMP_JPEG"
+            sips -s format png -s formatOptions normal "$TEMP_JPEG" --out "$ICON_PATH"
+            rm -f "$TEMP_JPEG"
+            echo "Removed alpha channel from app icon"
           else
             echo "Warning: App icon file not found at $ICON_PATH"
           fi
