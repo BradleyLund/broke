@@ -58,7 +58,7 @@ struct SuccessOverlay: View {
 
     var body: some View {
         ZStack {
-            Color.black.opacity(0.3)
+            Color.black
                 .edgesIgnoringSafeArea(.all)
 
             ConfettiView()
