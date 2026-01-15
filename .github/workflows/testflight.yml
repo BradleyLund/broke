@@ -83,19 +83,19 @@ jobs:
           /usr/libexec/PlistBuddy -c "Delete :signingStyle" ExportOptions.plist 2>/dev/null || true
           /usr/libexec/PlistBuddy -c "Add :signingStyle string manual" ExportOptions.plist
 
-      - name: Increment Build Number
-        run: |
-          BUILD_NUMBER=$(( ${{ github.run_number }} + 6 ))
-          /usr/libexec/PlistBuddy -c "Set :CFBundleVersion $BUILD_NUMBER" Broke/Info.plist
-
       - name: Build Archive
         run: |
+          # Use github.run_number plus your offset
+          BUILD_NUMBER=$((${{ github.run_number }} + 10)) 
+
           xcodebuild clean archive \
             -project "Broke.xcodeproj" \
             -scheme "Broke" \
             -archivePath "Broke.xcarchive" \
             -sdk iphoneos \
             -configuration Release \
+            MARKETING_VERSION="2.0" \
+            CURRENT_PROJECT_VERSION="$BUILD_NUMBER" \
             CODE_SIGN_STYLE="Manual" \
             CODE_SIGN_IDENTITY="Apple Distribution" \
             PROVISIONING_PROFILE_SPECIFIER="$PROVISIONING_PROFILE_UUID" \
