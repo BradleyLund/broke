@@ -84,10 +84,9 @@ jobs:
           /usr/libexec/PlistBuddy -c "Add :signingStyle string manual" ExportOptions.plist
 
       - name: Increment Build Number
-        env:
-          OFFSET: 6
         run: |
-          /usr/libexec/PlistBuddy -c "Set :CFBundleVersion ${{ github.run_number  }} + $OFFSET" Broke/Info.plist
+          BUILD_NUMBER=$(( ${{ github.run_number }} + 6 ))
+          /usr/libexec/PlistBuddy -c "Set :CFBundleVersion $BUILD_NUMBER" Broke/Info.plist
 
       - name: Build Archive
         run: |
