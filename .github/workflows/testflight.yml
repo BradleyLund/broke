@@ -2,12 +2,12 @@ name: Deploy to TestFlight
 
 on:
   push:
-    branches: [ "main" ]
+    branches: ["main"]
 
 jobs:
   build-and-deploy:
     runs-on: macos-latest
-    
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -43,7 +43,7 @@ jobs:
           PROVISIONING_PROFILE_UUID=$(/usr/libexec/PlistBuddy -c "Print UUID" "$PP_PLIST")
           echo "PROVISIONING_PROFILE_UUID=$PROVISIONING_PROFILE_UUID" >> $GITHUB_ENV
           echo "Extracted Provisioning Profile UUID: $PROVISIONING_PROFILE_UUID"
-          
+
           # apply provisioning profile with UUID as filename (required format)
           mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
           cp "$PP_PATH" ~/Library/MobileDevice/Provisioning\ Profiles/"$PROVISIONING_PROFILE_UUID.mobileprovision"
@@ -84,8 +84,10 @@ jobs:
           /usr/libexec/PlistBuddy -c "Add :signingStyle string manual" ExportOptions.plist
 
       - name: Increment Build Number
+        env:
+          OFFSET: 6
         run: |
-          /usr/libexec/PlistBuddy -c "Set :CFBundleVersion ${{ github.run_number }}" Broke/Info.plist
+          /usr/libexec/PlistBuddy -c "Set :CFBundleVersion ${{ github.run_number  }} + $OFFSET" Broke/Info.plist
 
       - name: Build Archive
         run: |
