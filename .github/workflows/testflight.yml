@@ -86,7 +86,7 @@ jobs:
       - name: Build Archive
         run: |
           # Use github.run_number plus your offset
-          BUILD_NUMBER=$((${{ github.run_number }} + 10)) 
+          BUILD_NUMBER=$(( ${{ github.run_number }} + 10 )) 
 
           xcodebuild clean archive \
             -project "Broke.xcodeproj" \
