@@ -56,7 +56,7 @@ jobs:
       - name: Remove Alpha Channel from App Icon
         run: |
           # Remove alpha channel from iOS app icon (1024x1024) using sips (built-in macOS tool)
-          ICON_PATH="Broke/Assets.xcassets/AppIcon.appiconset/Icon (3).png"
+          ICON_PATH="Broke/Assets.xcassets/AppIcon.appiconset/Icon.png"
           if [ -f "$ICON_PATH" ]; then
             # Convert to JPEG (removes alpha) then back to PNG to ensure no alpha channel
             TEMP_JPEG="$RUNNER_TEMP/icon_temp.jpg"
