@@ -19,6 +19,8 @@ struct BrokerView: View {
     @State private var showWrongTagAlert = false
     @State private var showCreateTagAlert = false
     @State private var nfcWriteSuccess = false
+    @State private var showSuccessOverlay = false
+    @State private var blockedDuration: TimeInterval = 0
     
     private var isBlocking : Bool {
         get {
@@ -32,16 +34,26 @@ struct BrokerView: View {
                 ZStack {
                     VStack(spacing: 0) {
                         blockOrUnblockButton(geometry: geometry)
-                        
+
                         if !isBlocking {
                             Divider()
-                            
+
                             ProfilesPicker(profileManager: profileManager)
                                 .frame(height: geometry.size.height / 2)
                                 .transition(.move(edge: .bottom))
                         }
                     }
                     .background(isBlocking ? Color("BlockingBackground") : Color("NonBlockingBackground"))
+
+                    if showSuccessOverlay {
+                        SuccessOverlay(duration: blockedDuration) {
+                            withAnimation {
+                                showSuccessOverlay = false
+                                appBlocker.clearBlockingStartTime()
+                            }
+                        }
+                        .transition(.opacity)
+                    }
                 }
             }
             .navigationBarItems(trailing: createTagButton)
@@ -96,7 +108,21 @@ struct BrokerView: View {
         nfcReader.scan { payload in
             if payload == tagPhrase {
                 NSLog("Toggling block")
+
+                // If we're currently blocking, capture the duration before toggling
+                let wasBlocking = appBlocker.isBlocking
+                if wasBlocking, let duration = appBlocker.getBlockedDuration() {
+                    blockedDuration = duration
+                }
+
                 appBlocker.toggleBlocking(for: profileManager.currentProfile)
+
+                // Show success overlay if we just unblocked
+                if wasBlocking {
+                    withAnimation(.spring()) {
+                        showSuccessOverlay = true
+                    }
+                }
             } else {
                 showWrongTagAlert = true
                 NSLog("Wrong Tag!\nPayload: \(payload)")

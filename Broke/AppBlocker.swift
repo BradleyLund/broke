@@ -12,7 +12,8 @@ class AppBlocker: ObservableObject {
     let store = ManagedSettingsStore()
     @Published var isBlocking = false
     @Published var isAuthorized = false
-    
+    @Published var blockingStartTime: Date?
+
     init() {
         loadBlockingState()
         Task {
@@ -39,10 +40,31 @@ class AppBlocker: ObservableObject {
             print("Not authorized to block apps")
             return
         }
-        
+
         isBlocking.toggle()
+
+        if isBlocking {
+            // Starting blocking - record the start time
+            blockingStartTime = Date()
+        } else {
+            // Stopping blocking - we can calculate duration in the view
+            // Keep the start time for now, view will clear it after showing confetti
+        }
+
         saveBlockingState()
         applyBlockingSettings(for: profile)
+    }
+
+    func getBlockedDuration() -> TimeInterval? {
+        guard let startTime = blockingStartTime else {
+            return nil
+        }
+        return Date().timeIntervalSince(startTime)
+    }
+
+    func clearBlockingStartTime() {
+        blockingStartTime = nil
+        saveBlockingState()
     }
     
     func applyBlockingSettings(for profile: Profile) {
@@ -58,9 +80,15 @@ class AppBlocker: ObservableObject {
     
     private func loadBlockingState() {
         isBlocking = UserDefaults.standard.bool(forKey: "isBlocking")
+        blockingStartTime = UserDefaults.standard.object(forKey: "blockingStartTime") as? Date
     }
-    
+
     private func saveBlockingState() {
         UserDefaults.standard.set(isBlocking, forKey: "isBlocking")
+        if let startTime = blockingStartTime {
+            UserDefaults.standard.set(startTime, forKey: "blockingStartTime")
+        } else {
+            UserDefaults.standard.removeObject(forKey: "blockingStartTime")
+        }
     }
 }
