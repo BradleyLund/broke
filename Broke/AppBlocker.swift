@@ -6,7 +6,7 @@
 //
 import SwiftUI
 import ManagedSettings
-import FamilyControls
+import FamilyControls 
 
 class AppBlocker: ObservableObject {
     let store = ManagedSettingsStore()
