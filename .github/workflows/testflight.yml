@@ -121,8 +121,15 @@ jobs:
 
       - name: Upload to TestFlight
         run: |
+          # altool can exit 0 even when the upload is rejected (e.g. an expired
+          # App Store Connect agreement), so also fail on any ERROR in its output.
+          set -o pipefail
           xcrun altool --upload-app \
             --type ios \
             --file "Output/Broke.ipa" \
             --apiKey "${{ secrets.APPSTORE_API_KEY_ID }}" \
-            --apiIssuer "${{ secrets.APPSTORE_ISSUER_ID }}"
+            --apiIssuer "${{ secrets.APPSTORE_ISSUER_ID }}" 2>&1 | tee altool.log
+          if grep -q "ERROR" altool.log; then
+            echo "::error::TestFlight upload failed - see altool output above"
+            exit 1
+          fi
